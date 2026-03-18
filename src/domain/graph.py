@@ -5,6 +5,7 @@ from .connection import Connection
 
 class Graph(BaseModel):
     """
+    Graph owns the full list of connections and adjacency
     zones (handle them with to mention it by its name):
     {
         "start": Zone(),
@@ -42,8 +43,18 @@ class Graph(BaseModel):
         self.adjacency[connection.zone_a].append(connection)
         self.adjacency[connection.zone_b].append(connection)
 
+    # ==== get zone and connection ====
+
     def get_zone(self, name: str) -> Zone:
         return self.zones[name]
+
+    def get_connection(self, zone_a: str, zone_b: str) -> Connection:
+        for connection in self.adjacency[zone_a]:
+            if connection.other_end(zone_a) == zone_b:
+                return connection
+        raise ValueError("could not get connection")
+
+    # ==== define neighbor zones and connectinos ====
 
     def neighbor_connections(self, zone_name: str) -> list[Connection]:
         return self.adjacency[zone_name]

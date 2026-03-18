@@ -8,7 +8,6 @@ zone_occupancy = {
     "roof1": set(),
     "goal": set(),
 }
-
 connection_occupancy = {
     "start-roof1": {1},
 }
@@ -54,12 +53,10 @@ class SimulationState(BaseModel):
     def remove_drone_from_zone(self, zone_name: str, drone: Drone) -> None:
         self.zone_occupancy[zone_name].remove(drone.drone_id)
 
-    def add_drone_to_connection(self, connection_name: str,
-                                drone: Drone) -> None:
+    def add_drone_to_connection(self, connection_name: str, drone: Drone) -> None:
         self.connection_occupancy[connection_name].add(drone.drone_id)
 
-    def remove_drone_from_connection(self, connection_name: str,
-                                     drone: Drone) -> None:
+    def remove_drone_from_connection(self, connection_name: str, drone: Drone) -> None:
         self.connection_occupancy[connection_name].remove(drone.drone_id)
 
     # ==== Investigating the drone status ====
@@ -100,7 +97,7 @@ class SimulationState(BaseModel):
             if drone.status != DroneStatus.DELIVERED
         ]
 
-    def all_delivered(self):
+    def all_delivered(self) -> bool:
         for drone in self.drones:
             if drone.status != DroneStatus.DELIVERED:
                 return False
@@ -108,7 +105,41 @@ class SimulationState(BaseModel):
 
     # ==== Implementing drone vehaviors ====
 
-    def apply_forced_arrivals(self, graph: Graph):
+    def move_drone(self, drone: Drone, target_zone: str, graph: Graph) -> None:
+        if graph.get_zone(target_zone).zone_type == ZoneType.RESTRICTED:
+            # remove drone from zone
+            current_zone = drone.current_zone
+            self.remove_drone_from_zone(current_zone, drone)
+
+            # add drone to connection
+            connection = graph.get_connection(current_zone, target_zone).connection_name
+            self.add_drone_to_connection(connection, drone)
+            drone.current_connection = connection
+
+            drone.status = DroneStatus.IN_RESTRICTED_TRANSIT
+            drone.target_zone = target_zone
+            drone.current_zone = None
+            drone.remaining_travel_turns = 1
+        else:
+            current_zone = drone.current_zone
+            self.remove_drone_from_zone(current_zone, drone)
+            self.add_drone_to_zone(target_zone, drone)
+            drone.current_zone = target_zone
+            if target_zone == graph.end_hub_name:
+                drone.status = DroneStatus.DELIVERED
+            else:
+                drone.status = DroneStatus.AT_ZONE
+            drone.target_zone = None
+            drone.current_connection = None
+            drone.remaining_travel_turns = 0
+
+
+    def apply_forced_arrivals(self, graph: Graph) -> None:
+        """
+        complete the landing
+        clean the transit fields
+        set status to DELIVERED or AT_ZONE
+        """
         for drone in self.forced_arrival_drones():
             connection_name = drone.current_connection
             target_zone = drone.target_zone
@@ -117,11 +148,21 @@ class SimulationState(BaseModel):
             drone.current_zone = target_zone
             if target_zone == graph.end_hub_name:
                 drone.status = DroneStatus.DELIVERED
-                drone.current_zone = target_zone
+                drone.current_connection = None
                 drone.remaining_travel_turns = 0
                 drone.target_zone = None
             else:
                 drone.status = DroneStatus.AT_ZONE
-                drone.current_zone = target_zone
+                drone.target_zone = None
                 drone.current_connection = None
                 drone.remaining_travel_turns = 0
+
+    # ==== invoke simulation ====
+    def choose_next_zone(drone: Drone, graph: Graph) -> str | None:
+        pass
+    
+    def simulate_one_turn(self, graph: Graph) -> None:
+        self.apply_forced_arrivals(graph)
+        free_drones = self.free_drones()
+        for drone in free_drones:
+            

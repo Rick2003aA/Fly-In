@@ -251,4 +251,33 @@ What SimulationState shold probably store
 3. zone occupancy
 4. connection occupancy
 
-### 2026/03/15
+### 2026/03/18
+Progress summary:
+- Finished most of the basic `SimulationState` query helpers.
+- Added occupancy helper methods for zones and connections.
+- Implemented the first movement behaviors:
+  - moving into a normal zone,
+  - starting restricted transit,
+  - completing forced arrivals from restricted transit.
+- Added `Graph.get_connection()` to identify the edge between two adjacent zones.
+- Started building the one-turn simulation flow with:
+  - forced arrivals first,
+  - then free drones,
+  - then choosing the next zone.
+
+Current focus:
+- finish `choose_next_zone()`
+- complete the first working `simulate_one_turn()`
+- keep the current logic simple before adding smarter routing
+
+Progress: 35%.
+
+My estimate by area:
+
+Domain model / base structures: 75%
+Simulation state helpers: 80%
+Movement mechanics: 55%
+One-turn engine: 20%
+Routing / decision logic: 10%
+Parser / integration: 0%
+Output formatting / tests / polish: 5%

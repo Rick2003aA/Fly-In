@@ -6,7 +6,6 @@ class ZoneType(Enum):
     BLOCKED = auto()
     RESTRICTED = auto()
     PRIORITY = auto()
-    GOAL = auto()
 
 
 class DroneStatus(Enum):
