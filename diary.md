@@ -281,3 +281,98 @@ One-turn engine: 20%
 Routing / decision logic: 10%
 Parser / integration: 0%
 Output formatting / tests / polish: 5%
+
+
+### 2026/03/23
+Goal for today:
+- finish the first working version of `simulate_one_turn()`
+- implement a temporary simple `choose_next_zone()` policy
+- make one drone and one simple map move correctly turn by turn
+- verify that normal moves and restricted arrivals both work in the same simulation flow
+
+Why this goal:
+- this is the shortest path from "helpers exist" to "the simulator actually runs"
+- once one turn works, the remaining work becomes much easier to test and improve
+- reaching this point today keeps the project on track to finish by the end of March
+
+Target by end of today:
+- forced arrivals are applied first
+- free drones can pick a next zone
+- `move_drone()` is called from `simulate_one_turn()`
+- one full turn can run without ambiguity
+
+After today:
+- improve route choice
+- add conflict resolution
+- connect multi-turn simulation loop
+- start parser and output integration
+
+
+Update:
+- Finished the first working version of `simulate_one_turn()`.
+- Confirmed normal movement and restricted transit both work in a basic single-drone scenario.
+- Added a simple `choose_next_zone()` policy that prefers the end hub if adjacent.
+- Added `can_enter_zone()` and connected it to the turn flow.
+- Built manual test scenarios in `test.py` and started testing with 2 drones.
+- Found the next major missing rule: connection capacity and restricted-entry validation are not enforced yet.
+
+What I learned today:
+- The basic simulator loop is now working.
+- Restricted movement needs stricter validation than normal zone movement.
+- Multi-drone tests are now exposing the real rule-enforcement gaps.
+
+### 2026/03/25
+Goal for today:
+- implement connection-capacity validation
+- prevent illegal restricted-transit starts when the connection is already full
+- make the 2-drone restricted test behave correctly
+- keep using small manual maps before moving to parser or output work
+
+Main task for today:
+- add `can_use_connection()`
+- use it before starting restricted transit
+- re-run the 2-drone test
+- confirm that only one drone enters `start-mid` when `max_link_capacity=1`
+- confirm that illegal double-arrival into `mid` no longer happens
+
+Success condition:
+- Turn 1: only one drone enters the restricted connection
+- Turn 2: only that drone arrives at `mid`
+- the second drone waits instead of violating connection or zone capacity
+
+
+Update:
+- Implemented `can_use_connection()` and connected it to restricted-move validation.
+- Re-ran the 2-drone restricted scenario in `test.py`.
+- Confirmed that only one drone can enter `start-mid` when `max_link_capacity=1`.
+- Confirmed that the second drone waits instead of entering the same restricted connection illegally.
+- Confirmed that the second drone moves only after the connection and destination become available.
+
+Result:
+- Today's task is done.
+- Connection capacity is now enforced in the current simulator flow.
+- The restricted 2-drone test now behaves correctly for this stage of the project.
+
+Next focus:
+- improve broader move/conflict validation
+- add more test scenarios for blocked, priority, and congestion cases
+- continue strengthening the one-turn engine before parser/output work
+
+
+### 2026/03/26
+Goal for tomorrow:
+- broaden simulator validation with more manual scenarios
+- confirm one-turn behavior stays correct for blocked, priority, and congestion cases
+- keep strengthening the one-turn engine before moving to parser or output work
+
+Main task for tomorrow:
+- add a blocked-zone test
+- add a priority-zone test
+- add a normal-zone congestion test
+- review whether `choose_next_zone()` needs a small improvement for these cases
+
+Success condition:
+- blocked zones are never chosen
+- when `max_drones=1`, only one drone enters the contested normal zone
+- the current simple routing remains valid on small test maps
+- the next missing rule becomes clear from test results

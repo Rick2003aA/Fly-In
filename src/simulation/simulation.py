@@ -133,36 +133,86 @@ class SimulationState(BaseModel):
             drone.current_connection = None
             drone.remaining_travel_turns = 0
 
-
-    def apply_forced_arrivals(self, graph: Graph) -> None:
+    def apply_forced_arrivals(self, graph: Graph) -> list[Drone]:
         """
         complete the landing
         clean the transit fields
         set status to DELIVERED or AT_ZONE
         """
+        arrived_drones = []
+
         for drone in self.forced_arrival_drones():
             connection_name = drone.current_connection
             target_zone = drone.target_zone
+
             self.remove_drone_from_connection(connection_name, drone)
             self.add_drone_to_zone(target_zone, drone)
+
             drone.current_zone = target_zone
+            drone.current_connection = None
+            drone.remaining_travel_turns = 0
+            drone.target_zone = None
+
             if target_zone == graph.end_hub_name:
                 drone.status = DroneStatus.DELIVERED
-                drone.current_connection = None
-                drone.remaining_travel_turns = 0
-                drone.target_zone = None
             else:
                 drone.status = DroneStatus.AT_ZONE
-                drone.target_zone = None
-                drone.current_connection = None
-                drone.remaining_travel_turns = 0
+
+            arrived_drones.append(drone)
+
+        return arrived_drones
 
     # ==== invoke simulation ====
-    def choose_next_zone(drone: Drone, graph: Graph) -> str | None:
-        pass
-    
+
+    def choose_next_zone(self, drone: Drone, graph: Graph) -> str | None:
+        neighbors = graph.neighbor_zones(drone.current_zone)
+        if graph.end_hub_name in neighbors:
+            return graph.end_hub_name
+
+        for zone in neighbors:
+            if graph.get_zone(zone).zone_type != ZoneType.BLOCKED:
+                return zone
+        return None
+
+    def can_enter_zone(self, zone_name: str, graph: Graph) -> bool:
+        if zone_name == graph.end_hub_name:
+            return True
+        if len(self.zone_occupancy[zone_name]) < graph.get_zone(zone_name).max_drones:
+            return True
+        else:
+            return False
+
+    def can_use_connection(self, connection_name: str, graph: Graph) -> bool:
+        for connection in graph.connections:
+            if connection.connection_name == connection_name:
+                return (
+                    len(self.connection_occupancy[connection_name])
+                    < connection.max_link_capacity
+                )
+        raise ValueError(f"Connection {connection_name} not found")
+
     def simulate_one_turn(self, graph: Graph) -> None:
-        self.apply_forced_arrivals(graph)
-        free_drones = self.free_drones()
+        arrived_drones = self.apply_forced_arrivals(graph)
+
+        free_drones = [
+            drone for drone in self.free_drones()
+            if drone not in arrived_drones
+        ]
+
         for drone in free_drones:
-            
+            next_zone = self.choose_next_zone(drone, graph)
+            if next_zone is None:
+                continue
+
+            if graph.get_zone(next_zone).zone_type == ZoneType.RESTRICTED:
+                connection = graph.get_connection(drone.current_zone, next_zone)
+                if (
+                    self.can_enter_zone(next_zone, graph)
+                    and self.can_use_connection(connection.connection_name, graph)
+                ):
+                    self.move_drone(drone, next_zone, graph)
+            else:
+                if self.can_enter_zone(next_zone, graph):
+                    self.move_drone(drone, next_zone, graph)
+
+        self.current_turn_number += 1

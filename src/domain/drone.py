@@ -5,6 +5,7 @@ from .enums import DroneStatus
 There are some elements which are unneccessary depending on drone status
 """
 
+
 class Drone(BaseModel):
     """
     Represents one drone in the simulation.
