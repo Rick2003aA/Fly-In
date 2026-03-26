@@ -14,4 +14,4 @@ class Connection(BaseModel):
             elif zone_name == self.zone_b:
                 return (self.zone_a)
         except ValueError:
-            print("Error")
+            print("Error has occured in othre_end()")

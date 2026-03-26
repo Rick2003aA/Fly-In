@@ -358,21 +358,77 @@ Next focus:
 - add more test scenarios for blocked, priority, and congestion cases
 - continue strengthening the one-turn engine before parser/output work
 
-
 ### 2026/03/26
-Goal for tomorrow:
-- broaden simulator validation with more manual scenarios
-- confirm one-turn behavior stays correct for blocked, priority, and congestion cases
-- keep strengthening the one-turn engine before moving to parser or output work
+Progress summary:
+- Updated `simulate_one_turn()` so it returns the drones that moved during the turn in subject-style output format.
+- Added per-turn movement recording for:
+  - normal / priority / end-zone arrivals as `D<ID>-<zone>`
+  - restricted departures as `D<ID>-<connection>`
+  - forced restricted arrivals as `D<ID>-<zone>`
+- Updated `test.py` so the simulation can run until all drones are delivered and print one output line per turn.
+- Began refactoring the turn logic toward a planning flow using the term `planned_move`.
+- Added early helper structure for:
+  - `build_planned_moves()`
+  - `apply_planned_move()`
+- Confirmed an important behavior gap:
+  - when two drones both prefer the same priority zone, the second drone currently waits instead of falling back to another valid zone in the same turn.
 
-Main task for tomorrow:
-- add a blocked-zone test
-- add a priority-zone test
-- add a normal-zone congestion test
-- review whether `choose_next_zone()` needs a small improvement for these cases
+Current state at end of day:
+- Output recording is working.
+- Full manual run loop is working.
+- The refactor from single-choice routing to ordered fallback choices is not finished yet.
 
-Success condition:
-- blocked zones are never chosen
-- when `max_drones=1`, only one drone enters the contested normal zone
-- the current simple routing remains valid on small test maps
-- the next missing rule becomes clear from test results
+Next task for tomorrow:
+1. Fix `choose_next_zones()` so it always returns `list[str]` and never duplicates priority zones.
+2. Change `build_planned_moves()` so each planned move stores:
+   - the drone
+   - ordered `zone_options`
+3. Update `simulate_one_turn()` to try each zone option in order and stop at the first valid one.
+4. Re-test the current map and confirm turn 0 becomes:
+   - `D1-priority_mid D2-mid`
+
+
+### 2026/03/27
+Plan:
+- Finish the transition from single-choice routing to ordered fallback routing.
+- First, repair `choose_next_zones()`:
+  - always return `list[str]`
+  - return `[end_hub]` immediately if the end hub is adjacent
+  - collect priority neighbors first
+  - collect other non-blocked neighbors second
+  - never duplicate a zone in the returned list
+- Then simplify `build_planned_moves()`:
+  - each planned move should contain only:
+    - `drone`
+    - `zone_options`
+  - do not decide `connection_name` or `is_restricted` yet at that stage
+- Then simplify `apply_planned_move()`:
+  - accept `drone`, `target_zone`, and `graph`
+  - compute restricted-vs-normal behavior inside that method
+  - return output string in subject format
+- Then update `simulate_one_turn()`:
+  - for each planned move, try `zone_options` in order
+  - apply the first valid move
+  - if the first option is full, try the next option
+  - if no option is valid, the drone waits
+- Re-test the current map and verify:
+  - turn 0: `D1-priority_mid D2-mid`
+  - turn 1: `D1-goal D2-goal`
+- If that works, the next follow-up task will be central conflict resolution / reservation logic for truly simultaneous turns.
+
+A realistic remaining path is:
+
+- **March 26**: blocked / priority / congestion tests, tighten one-turn behavior
+- **March 27**: improve move validation and conflict handling
+- **March 28**: build or stabilize the full multi-turn simulation loop
+- **March 29**: implement parser
+- **March 30**: connect parser + simulation + output
+- **March 31**: fix bugs, run manual test maps, polish
+
+So my answer is:
+
+- **Tomorrow’s plan is good**
+- **but it is only one step**
+- **to finish by month-end, you now need to prioritize end-to-end completion over elegance**
+
+If you want, tomorrow we should probably not just do test coverage. We should also keep one eye on the bigger deadline and choose the next steps aggressively.

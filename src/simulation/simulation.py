@@ -103,7 +103,7 @@ class SimulationState(BaseModel):
                 return False
         return True
 
-    # ==== Implementing drone vehaviors ====
+    # ==== Implementing drone behaviors ====
 
     def move_drone(self, drone: Drone, target_zone: str, graph: Graph) -> None:
         if graph.get_zone(target_zone).zone_type == ZoneType.RESTRICTED:
@@ -162,16 +162,21 @@ class SimulationState(BaseModel):
 
         return arrived_drones
 
-    # ==== invoke simulation ====
+    # ==== Simulation ====
 
-    def choose_next_zone(self, drone: Drone, graph: Graph) -> str | None:
+    def choose_next_zones(self, drone: Drone, graph: Graph) -> list[str]:
+        zone_options = []
         neighbors = graph.neighbor_zones(drone.current_zone)
         if graph.end_hub_name in neighbors:
-            return graph.end_hub_name
+            return [graph.end_hub_name]
 
         for zone in neighbors:
+            if graph.get_zone(zone).zone_type == ZoneType.PRIORITY:
+                zone_options.append(zone)
             if graph.get_zone(zone).zone_type != ZoneType.BLOCKED:
-                return zone
+                zone_options.append(zone)
+        if zone_options:
+            return zone_options
         return None
 
     def can_enter_zone(self, zone_name: str, graph: Graph) -> bool:
@@ -191,28 +196,80 @@ class SimulationState(BaseModel):
                 )
         raise ValueError(f"Connection {connection_name} not found")
 
-    def simulate_one_turn(self, graph: Graph) -> None:
+    def build_planned_moves(
+        self, graph: Graph, free_drones: list[Drone]
+    ) -> list[dict[str, object]]:
+        planned_moves: list[dict[str, object]] = []
+
+        for drone in free_drones:
+            zone_options = self.choose_next_zone(drone, graph)
+            if zone_options is None:
+                continue
+
+            if graph.get_zone(zone_options).zone_type == ZoneType.RESTRICTED:
+                connection = graph.get_connection(drone.current_zone,
+                                                  zone_options)
+                planned_move = {
+                    "drone": drone,
+                    "target_zone": zone_options,
+                    "connection_name": connection.connection_name,
+                    "is_restricted": True,
+                }
+            else:
+                planned_move = {
+                    "drone": drone,
+                    "target_zone": zone_options,
+                    "connection_name": None,
+                    "is_restricted": False,
+                }
+
+            planned_moves.append(planned_move)
+
+        return planned_moves
+
+    def apply_planned_move(
+        self, planned_move: dict[str, object], graph: Graph
+    ) -> str:
+        drone = planned_move["drone"]
+        target_zone = planned_move["target_zone"]
+        connection_name = planned_move["connection_name"]
+
+        self.move_drone(drone, target_zone, graph)
+
+        if planned_move["is_restricted"]:
+            return f"D{drone.drone_id}-{connection_name}"
+        return f"D{drone.drone_id}-{target_zone}"
+
+    def simulate_one_turn(self, graph: Graph) -> list[str]:
+        moved_drones: list[str] = []
+
         arrived_drones = self.apply_forced_arrivals(graph)
+        for drone in arrived_drones:
+            moved_drones.append(f"D{drone.drone_id}-{drone.current_zone}")
 
         free_drones = [
             drone for drone in self.free_drones()
             if drone not in arrived_drones
         ]
+        planned_moves = self.build_planned_moves(graph, free_drones)
 
-        for drone in free_drones:
-            next_zone = self.choose_next_zone(drone, graph)
-            if next_zone is None:
-                continue
+        for planned_move in planned_moves:
+            target_zone = planned_move["target_zone"]
 
-            if graph.get_zone(next_zone).zone_type == ZoneType.RESTRICTED:
-                connection = graph.get_connection(drone.current_zone, next_zone)
+            if planned_move["is_restricted"]:
+                connection_name = planned_move["connection_name"]
                 if (
-                    self.can_enter_zone(next_zone, graph)
-                    and self.can_use_connection(connection.connection_name, graph)
+                    self.can_enter_zone(target_zone, graph)
+                    and self.can_use_connection(connection_name, graph)
                 ):
-                    self.move_drone(drone, next_zone, graph)
+                    moved_drones.append(
+                        self.apply_planned_move(planned_move, graph)
+                    )
             else:
-                if self.can_enter_zone(next_zone, graph):
-                    self.move_drone(drone, next_zone, graph)
+                if self.can_enter_zone(target_zone, graph):
+                    moved_drones.append(
+                        self.apply_planned_move(planned_move, graph)
+                    )
 
         self.current_turn_number += 1
+        return moved_drones
