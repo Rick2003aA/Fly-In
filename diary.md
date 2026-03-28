@@ -416,19 +416,120 @@ Plan:
   - turn 1: `D1-goal D2-goal`
 - If that works, the next follow-up task will be central conflict resolution / reservation logic for truly simultaneous turns.
 
-A realistic remaining path is:
 
-- **March 26**: blocked / priority / congestion tests, tighten one-turn behavior
-- **March 27**: improve move validation and conflict handling
-- **March 28**: build or stabilize the full multi-turn simulation loop
-- **March 29**: implement parser
-- **March 30**: connect parser + simulation + output
-- **March 31**: fix bugs, run manual test maps, polish
+### 2026/03/28
+Current project state vs diary:
+- The diary is behind the real codebase.
+- `SimulationState` is no longer only a basic one-turn skeleton:
+  - forced arrivals work
+  - restricted transit works
+  - connection-capacity checks exist
+  - per-turn moved-drone output exists through `simulate_one_turn() -> list[str]`
+  - `test.py` can run turns until all drones are delivered and print turn-by-turn output
+- Routing has advanced beyond the old `choose_next_zone()` note in the diary:
+  - the code now uses `choose_next_zones()`
+  - the simulator builds `planned_moves`
+  - one drone can fall back to another valid zone option in the same turn
+- Manual tests have advanced beyond the older diary entries:
+  - restricted-entry capacity was verified
+  - fallback from preferred path to another valid path was verified
+  - restricted output / forced-arrival output was manually exercised
 
-So my answer is:
+What is actually done now:
+- Domain models: mostly done
+- Simulation state helpers: mostly done
+- One-turn simulation flow: working for the current manual scenarios
+- Restricted transit / forced arrival: working
+- Connection capacity enforcement: working
+- Ordered fallback routing: working in current manual tests
+- Turn-by-turn movement output: working in manual tests
 
-- **Tomorrow’s plan is good**
-- **but it is only one step**
-- **to finish by month-end, you now need to prioritize end-to-end completion over elegance**
+What is still missing:
+- Centralized conflict resolution / reservation logic for more simultaneous validity
+- Parser and input validation
+- Final subjecpdated progress estimate:t-facing program flow from parsed file to printed output
+- Final output integration beyond manual `test.py`
+- Cleanup for pdated progress estimate:typing / mypy / flake8
+- Better test coverage and more deterministic verification
 
-If you want, tomorrow we should probably not just do test coverage. We should also keep one eye on the bigger deadline and choose the next steps aggressively.
+Updated progress estimate:
+- Roughly 60% done overall
+- Core simulation logic is much further along than the diary from 03/18-03/25 suggests
+- The main unfinished work is now integration + robustness, not basic movement rules
+
+Goal for today:
+- turn the current working simulation into something that can realistically be finished by the end of March
+- avoid starting large new experiments
+- focus on the shortest path to a correct mandatory-version deliverable
+
+Today's priority tasks:
+1. Lock the current simulator behavior and stop expanding the routing logic for now.
+2. Add one more manual verification scenario for simultaneous/conflict behavior that is most likely to break.
+3. Start the parser skeleton:
+   - read input lines
+   - identify `nb_drones`
+   - identify hubs
+   - identify connections
+4. Decide the final program flow:
+   - parse file
+   - build `Graph`
+   - build initial `SimulationState`
+   - run until all drones are delivered
+   - print one line per turn
+5. Leave algorithm optimization for after the parser-to-output path is complete.
+
+Finish-by-end-of-month plan:
+- 03/28:
+  - organize the true project state
+  - freeze the current simulator design
+  - begin parser skeleton
+- 03/29:
+  - finish parser and validation for the mandatory input structure
+  - connect parser output to `Graph` + `SimulationState`
+- 03/30:
+  - build the final run loop from parsed file to printed output
+  - verify output format on multiple manual maps
+- 03/31:
+  - fix bugs
+  - clean naming / typing
+  - do final manual scenario checks
+  - make sure the project is explainable for review
+
+Definition of "finished enough" by 03/31:
+- the program can parse a valid map file
+- build the graph and initial simulation state
+- run until all drones are delivered
+- print valid turn-by-turn output
+- respect blocked / priority / restricted / zone-capacity / connection-capacity rules in the tested cases
+
+Update:
+- Activated `parser.py` through `test.py` using a real map file from `maps/`.
+- Confirmed the parser can now:
+  - read a map file,
+  - build `Graph`,
+  - build initial `SimulationState`,
+  - and start the simulation loop.
+- Confirmed `distances_to_goal()` now computes sensible values on `maps/easy/01_linear_path.txt`:
+  - `goal: 0`
+  - `waypoint2: 1`
+  - `waypoint1: 2`
+  - `start: 3`
+- Found the next algorithm gap clearly:
+  - the simulator still loops infinitely on the linear map because `choose_next_zones()` does not use `distances_to_goal()` yet.
+  - drones can still move backward when a forward move is blocked, causing `start <-> waypoint1` oscillation.
+
+Today's conclusion:
+- Parser activation is done.
+- Dijkstra distance computation is started and basically working.
+- The next unfinished step is integrating distance-based routing into `choose_next_zones()`.
+
+Resume point for tomorrow:
+1. Rewrite `choose_next_zones()` to use `distances_to_goal(graph)`.
+2. Only keep neighbors that improve progress toward the goal:
+   - keep zones where `distances[neighbor] < distances[current_zone]`
+   - skip blocked zones
+3. Sort remaining candidate zones by:
+   - smaller distance first
+   - priority as tie-breaker if needed
+4. Return `[]` when no improving move exists so the drone waits instead of moving backward.
+5. Re-run `maps/easy/01_linear_path.txt` and confirm the infinite loop is gone.
