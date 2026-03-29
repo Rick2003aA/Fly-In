@@ -533,3 +533,59 @@ Resume point for tomorrow:
    - priority as tie-breaker if needed
 4. Return `[]` when no improving move exists so the drone waits instead of moving backward.
 5. Re-run `maps/easy/01_linear_path.txt` and confirm the infinite loop is gone.
+
+
+### 2026/03/29
+Checklist for today:
+- [x] Finish the routing fix by connecting `distances_to_goal()` to `choose_next_zones()`.
+- [x] Stop the infinite loop on `maps/easy/01_linear_path.txt`.
+- [x] Confirm the simulator now prefers forward progress and waits instead of useless backtracking.
+- [ ] Run the parser + simulator + output pipeline end to end on at least:
+  - [x] `maps/easy/01_linear_path.txt`
+  - [x] one more easy map
+  - [x] one medium map if the first two pass
+- [x] Confirm turn-by-turn output still works after the routing change.
+- [x] Check that blocked / restricted / priority behavior still works after the Dijkstra-based routing update.
+- [ ] Harden the parser only where real map execution exposes problems.
+- [ ] Decide the minimum final program flow to keep for submission:
+  - parse input file
+  - build `Graph`
+  - build `SimulationState`
+  - run until all drones are delivered
+  - print one line per turn
+- [ ] Avoid large new refactors or optimization-only work today.
+
+Success condition for today:
+- the project runs from a real map file to final printed output without infinite loops on the tested cases
+- the remaining work for 03/31 is mostly bug fixing, cleanup, and review preparation
+
+Update:
+- Connected `distances_to_goal()` to `choose_next_zones()`.
+- Replaced the old local neighbor preference with distance-based forward-progress routing.
+- Confirmed that `maps/easy/01_linear_path.txt` no longer loops infinitely.
+- Confirmed current output on the easy linear map is now:
+  - `D1-waypoint1`
+  - `D1-waypoint2 D2-waypoint1`
+  - `D1-goal D2-waypoint2`
+  - `D2-goal`
+- This means the parser + simulator + output pipeline is now working end to end on at least one real subject map.
+- Continued verification on real subject maps and confirmed additional passes on:
+  - `maps/easy/02_simple_fork.txt`
+  - `maps/medium/01_dead_end_trap.txt`
+  - `maps/medium/03_priority_puzzle.txt`
+- Ran the full provided map set with a turn limit and confirmed all maps currently terminate successfully:
+  - `maps/challenger/01_the_impossible_dream.txt` -> 45 turns
+  - `maps/easy/01_linear_path.txt` -> 4 turns
+  - `maps/easy/02_simple_fork.txt` -> 4 turns
+  - `maps/easy/03_basic_capacity.txt` -> 4 turns
+  - `maps/hard/01_maze_nightmare.txt` -> 14 turns
+  - `maps/hard/02_capacity_hell.txt` -> 18 turns
+  - `maps/hard/03_ultimate_challenge.txt` -> 26 turns
+  - `maps/medium/01_dead_end_trap.txt` -> 8 turns
+  - `maps/medium/02_circular_loop.txt` -> 16 turns
+  - `maps/medium/03_priority_puzzle.txt` -> 7 turns
+
+Current status:
+- The parser + simulator + output pipeline is now working across the full provided map set.
+- The next useful focus is no longer core routing correctness.
+- The next useful focus is parser hardening, final program flow, and cleanup for submission / review readiness.

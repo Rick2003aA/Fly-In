@@ -167,25 +167,29 @@ class SimulationState(BaseModel):
 
     def choose_next_zones(self, drone: Drone, graph: Graph) -> list[str]:
         """
-        priorityが先、othersが後に処理されるような配列(str)を作成する
-        ここですでにPriorityの最適化は完了している
+        distances_to_goalでゴールからすべての地点までの道筋にかかるコストを調べる
+        現在地からゴールまでにかかるコストを抽出する
+        neighborsの中から、コストが現状よりも少ないOR Priorityを選択
+        adjacentにend_hubがあればend_hubを返す
         """
-        priority_zones = []
-        other_zones = []
-        neighbors = graph.neighbor_zones(drone.current_zone)
+        priority_zone = []
+        normal_zone = []
+        distances = self.distances_to_goal(graph)
+        current_zone = drone.current_zone
+        current_distance = distances[current_zone]
+        neighbors = graph.neighbor_zones(current_zone)
         if graph.end_hub_name in neighbors:
             return [graph.end_hub_name]
-
-        for zone in neighbors:
-            zone_type = graph.get_zone(zone).zone_type
-            if zone_type == ZoneType.BLOCKED:
+        for neighbor in neighbors:
+            if graph.get_zone(neighbor).zone_type == ZoneType.BLOCKED:
                 continue
-            if zone_type == ZoneType.PRIORITY:
-                priority_zones.append(zone)
-            else:
-                other_zones.append(zone)
 
-        return priority_zones + other_zones
+            if current_distance > distances[neighbor] and graph.get_zone(neighbor).zone_type == ZoneType.PRIORITY:
+                priority_zone.append(neighbor)
+
+            elif current_distance > distances[neighbor]:
+                normal_zone.append(neighbor)
+        return priority_zone + normal_zone
 
     def can_enter_zone(self, zone_name: str, graph: Graph) -> bool:
         if zone_name == graph.end_hub_name:
@@ -244,7 +248,7 @@ class SimulationState(BaseModel):
         elif zone_type == ZoneType.RESTRICTED:
             return 2
         else:
-            raise ValueError("fuck")
+            raise ValueError("Error")
 
     def distances_to_goal(self, graph: Graph) -> dict[str, int]:
         """
@@ -253,6 +257,18 @@ class SimulationState(BaseModel):
         3. 2で確定した地点とつながっているかつ未確定な地点に対し、かかる時間を計算し
         書き込まれている数より小さければ更新
         4. すべての地点が確定すれば終了。else, 2に戻る
+
+        Map:
+        start -> normal -> restricted -> goal
+
+        Return:
+        {
+            "goal": 0,
+            "restricted": 1,
+            "normal": 3,
+            "start": 4,
+        }
+
         """
         distances = {zone_name: float("inf") for zone_name in graph.zones}
         goal = graph.end_hub_name
